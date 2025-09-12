@@ -218,7 +218,7 @@ export default component$(() => {
           )}
 
        {classes.value.length > 0 && (
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-1 gap-6">
     {classes.value.map((c) => (
       <div key={c.id} class="border p-4 rounded shadow bg-white/70">
         {editingItem.value === c.id ? (

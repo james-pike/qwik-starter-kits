@@ -54,7 +54,7 @@ export const MenuModal = component$(() => {
           ></div>
 
           {/* Menu Panel */}
-          <div class="fixed top-0 right-0 h-full w-64 bg-white/80 shadow-lg z-50 transform transition-transform">
+          <div class="fixed top-0 right-0 h-full w-64 bg-white/95 shadow-lg z-50 transform transition-transform">
             <div class="p-4">
               {/* Close Button */}
               <div class="flex justify-end mb-6">
