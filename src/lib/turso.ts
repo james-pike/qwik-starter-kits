@@ -488,17 +488,19 @@ export async function updateClass(
   }
   try {
     console.log(`Attempting to update class ID ${id} with:`, { name, description, url, image: `base64(...${image.slice(-20)})`, isActive });
-    await client.execute('BEGIN TRANSACTION');
+    
     const res = await client.execute({
       sql: 'UPDATE classes SET name = ?, description = ?, url = ?, image = ?, isActive = ? WHERE id = ?',
       args: [name, description, url, image, isActive, id],
     });
+    
     if (res.rowsAffected === 0) {
       console.warn(`No class found with ID: ${id}`);
       throw new Error(`No class found with ID: ${id}`);
     }
-    await client.execute('COMMIT');
+    
     console.log(`Successfully updated class with ID: ${id}`);
+    
     // Verify update
     const verify = await client.execute({
       sql: 'SELECT * FROM classes WHERE id = ?',
@@ -510,7 +512,6 @@ export async function updateClass(
       console.warn(`Verification failed: No class found after update for ID: ${id}`);
     }
   } catch (error) {
-    await client.execute('ROLLBACK');
     console.error('Error updating class:', error);
     throw new Error(`Failed to update class: ${error}`);
   }
@@ -581,17 +582,19 @@ export async function updateGalleryImage(client: Client, id: number, image: stri
   }
   try {
     console.log(`Attempting to update gallery image ID ${id} with:`, { filename, image: `base64(...${image.slice(-20)})` });
-    await client.execute('BEGIN TRANSACTION');
+    
     const res = await client.execute({
       sql: 'UPDATE gallery_images SET image = ?, filename = ? WHERE id = ?',
       args: [image, filename, id],
     });
+    
     if (res.rowsAffected === 0) {
       console.warn(`No gallery image found with ID: ${id}`);
       throw new Error(`No gallery image found with ID: ${id}`);
     }
-    await client.execute('COMMIT');
+    
     console.log(`Successfully updated gallery image with ID: ${id}`);
+    
     // Verify update
     const verify = await client.execute({
       sql: 'SELECT * FROM gallery_images WHERE id = ?',
@@ -603,7 +606,6 @@ export async function updateGalleryImage(client: Client, id: number, image: stri
       console.warn(`Verification failed: No gallery image found after update for ID: ${id}`);
     }
   } catch (error) {
-    await client.execute('ROLLBACK');
     console.error('Error updating gallery image:', error);
     throw new Error(`Failed to update gallery image: ${error}`);
   }

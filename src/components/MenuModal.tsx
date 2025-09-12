@@ -17,7 +17,7 @@ export const MenuModal = component$(() => {
       {/* Hamburger Menu Button */}
       <button
         onClick$={toggleMenu}
-        class="p-2 rounded-md hover:bg-gray-100 transition-colors"
+        class="p-2 rounded-md -mr-2 hover:bg-gray-100 transition-colors"
         aria-label="Toggle menu"
       >
         <svg
@@ -54,7 +54,7 @@ export const MenuModal = component$(() => {
           ></div>
 
           {/* Menu Panel */}
-          <div class="fixed top-0 right-0 h-full w-64 bg-white shadow-lg z-50 transform transition-transform">
+          <div class="fixed top-0 right-0 h-full w-64 bg-white/80 shadow-lg z-50 transform transition-transform">
             <div class="p-4">
               {/* Close Button */}
               <div class="flex justify-end mb-6">
