@@ -136,6 +136,29 @@ export const Header = component$(() => {
     }
   });
 
+  // Helper function to render avatar
+  const renderAvatar = () => {
+    const user = session.value?.user;
+    const isAdminUser = user?.role === 'admin' || user?.email === 'admin';
+    
+    if (isAdminUser || !user?.image) {
+      // Show letter avatar for admin users or users without images
+      return (
+        <div class="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+          A
+        </div>
+      );
+    }
+    
+    // Show regular avatar for users with images
+    return (
+      <Avatar
+        src={user.image}
+        alt={user.name ?? ""}
+      />
+    );
+  };
+
   return (
     <header class="flex h-20 max-w-7xl mx-auto items-center gap-3 border-b px-4 py-3">
       <img src="/images/logo.svg" alt="Logo" class="h-12 w-12 mr-3" />
@@ -174,10 +197,7 @@ export const Header = component$(() => {
               class="flex items-center gap-2 p-1 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
               aria-label="User menu"
             >
-              <Avatar
-                src={session.value.user.image ?? ""}
-                alt={session.value.user.name ?? ""}
-              />
+              {renderAvatar()}
               {/* Chevron down icon */}
               <svg
                 class={`w-4 h-4 text-slate-600 transition-transform duration-200 ${

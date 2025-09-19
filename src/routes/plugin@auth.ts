@@ -77,8 +77,8 @@ export const { onRequest, useSession, useSignIn, useSignOut } = QwikAuth$(
               console.log("✅ Admin credentials verified");
               return {
                 id: "admin",
-                name: "Administrator",
-                email: "admin@local",
+                name: "Admin",
+                email: "admin",
                 role: "admin"
               };
             }
