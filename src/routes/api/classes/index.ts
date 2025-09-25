@@ -1,6 +1,15 @@
-// src/routes/api/c lasses/index.ts
+// src/routes/api/classes/index.ts
 import type { RequestHandler } from '@builder.io/qwik-city';
 import { tursoClient, getClasses, createClass, updateClass, deleteClass } from '~/lib/turso';
+
+// Helper to estimate file size from base64 string
+const getBase64SizeInBytes = (base64String: string): number => {
+  // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
+  const base64Data = base64String.replace(/^data:image\/[a-z]+;base64,/, '');
+  // Base64: 4 characters represent 3 bytes, padding ('=') is ignored
+  const padding = base64Data.endsWith('==') ? 2 : base64Data.endsWith('=') ? 1 : 0;
+  return (base64Data.length * 3) / 4 - padding;
+};
 
 export const onGet: RequestHandler = async ({ json, env }) => {
   console.log('GET /api/classes - Request received');
@@ -41,6 +50,15 @@ export const onPost: RequestHandler = async ({ request, json, env }) => {
       return;
     }
 
+    // Check image size (2MB limit = 2 * 1024 * 1024 bytes)
+    const maxSizeBytes = 2 * 1024 * 1024;
+    const imageSizeBytes = getBase64SizeInBytes(image);
+    if (imageSizeBytes > maxSizeBytes) {
+      console.log('POST /api/classes - Image size exceeds 2MB:', { size: imageSizeBytes });
+      json(400, { error: 'Image size exceeds 2MB limit' });
+      return;
+    }
+
     const client = await tursoClient({ env });
     const id = await createClass(client, name, description, url, image, isActive);
     console.log('POST /api/classes - Class created with ID:', id);
@@ -69,6 +87,15 @@ export const onPut: RequestHandler = async ({ request, json, env }) => {
     if (!image.startsWith('data:image/')) {
       console.log('PUT /api/classes - Invalid image format:', { image: `base64(...${image.slice(-20)})` });
       json(400, { error: 'Image must be a valid base64-encoded image' });
+      return;
+    }
+
+    // Check image size (2MB limit = 2 * 1024 * 1024 bytes)
+    const maxSizeBytes = 2 * 1024 * 1024;
+    const imageSizeBytes = getBase64SizeInBytes(image);
+    if (imageSizeBytes > maxSizeBytes) {
+      console.log('PUT /api/classes - Image size exceeds 2MB:', { size: imageSizeBytes });
+      json(400, { error: 'Image size exceeds 2MB limit' });
       return;
     }
 
