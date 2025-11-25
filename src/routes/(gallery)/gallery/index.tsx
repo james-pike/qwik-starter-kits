@@ -160,9 +160,7 @@ export default component$(() => {
     errorMessage.value = '';
   });
 
-  const clearLoading = $(() => {
-    loadingMessage.value = '';
-  });
+
 
   const toggle = $((id: number) => {
     openItem.value = openItem.value === id ? null : id;

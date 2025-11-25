@@ -12,22 +12,39 @@ export const Header = component$(() => {
   const dropdownOpen = useSignal(false);
   const redeployDisabled = useSignal(false);
   const cooldownEndTime = useSignal<number | null>(null);
+  const redeployCount = useSignal(0);
 
   const store = useStore({
     isMobile: false,
     isInitialized: false,
   });
 
-  // Check cooldown status on component mount
+  // Check cooldown status and redeploy count on component mount
   useVisibleTask$(() => {
     try {
+      // Check if we need to reset the daily counter
+      const lastResetDate = localStorage.getItem('redeployLastResetDate');
+      const today = new Date().toDateString();
+
+      if (lastResetDate !== today) {
+        // New day, reset counter
+        localStorage.setItem('redeployCount', '0');
+        localStorage.setItem('redeployLastResetDate', today);
+        redeployCount.value = 0;
+      } else {
+        // Load existing count
+        const savedCount = localStorage.getItem('redeployCount');
+        redeployCount.value = savedCount ? parseInt(savedCount) : 0;
+      }
+
+      // Check cooldown status
       const savedCooldownEnd = localStorage.getItem('redeployCooldownEnd');
       if (savedCooldownEnd) {
         const endTime = parseInt(savedCooldownEnd);
         if (Date.now() < endTime) {
           cooldownEndTime.value = endTime;
           redeployDisabled.value = true;
-          
+
           // Set timeout to re-enable when cooldown expires
           const timeRemaining = endTime - Date.now();
           setTimeout(() => {
@@ -83,24 +100,30 @@ export const Header = component$(() => {
 
   const handleRedeploy = $(async () => {
     if (redeployDisabled.value) return;
-    
+
     dropdownOpen.value = false;
-    
-    // Set cooldown (1 hour = 3600000ms)
-    const cooldownDuration = 20 * 60 * 1000;
+
+    // Determine cooldown duration based on redeploy count
+    // First redeploy: 5 minutes, subsequent: 10 minutes
+    const cooldownDuration = redeployCount.value === 0 ? 5 * 60 * 1000 : 10 * 60 * 1000;
     const endTime = Date.now() + cooldownDuration;
-    
+
     redeployDisabled.value = true;
     cooldownEndTime.value = endTime;
-    
+
+    // Increment and save redeploy count
+    const newCount = redeployCount.value + 1;
+    redeployCount.value = newCount;
+
     try {
-      // Save cooldown to localStorage if available
+      // Save cooldown and count to localStorage if available
       localStorage.setItem('redeployCooldownEnd', endTime.toString());
+      localStorage.setItem('redeployCount', newCount.toString());
     } catch (error) {
       // localStorage not available, cooldown will only last this session
       console.log('localStorage not available, using session-only cooldown');
     }
-    
+
     // Set timeout to re-enable after cooldown
     setTimeout(() => {
       redeployDisabled.value = false;
