@@ -148,8 +148,16 @@ export default component$(() => {
     isActive: 0,
   });
 
-  // Initialize classes
-  if (userSignal.value?.user) classes.value = loaderData.value;
+  // Initialize classes and sort them (active first, inactive at bottom)
+  if (userSignal.value?.user) {
+    classes.value = [...loaderData.value].sort((a, b) => {
+      // Sort by isActive descending (1 before 0), then by order
+      if (a.isActive !== b.isActive) {
+        return (b.isActive || 0) - (a.isActive || 0);
+      }
+      return (a.order || 0) - (b.order || 0);
+    });
+  }
 
   const clearError = $(() => (errorMessage.value = ''));
 
@@ -217,7 +225,13 @@ export default component$(() => {
       await updateClassAction(editingItem.value, editForm.name, editForm.description, editForm.url, editForm.image, editForm.isActive);
       classes.value = classes.value.map(item =>
         item.id === editingItem.value ? { ...item, ...editForm } : item
-      );
+      ).sort((a, b) => {
+        // Sort by isActive descending (1 before 0), then by order
+        if (a.isActive !== b.isActive) {
+          return (b.isActive || 0) - (a.isActive || 0);
+        }
+        return (a.order || 0) - (b.order || 0);
+      });
       loadingMessage.value = '';
       cancelEdit();
     } catch (err) {
@@ -231,7 +245,13 @@ export default component$(() => {
       loadingMessage.value = 'Adding class...';
       errorMessage.value = '';
       const newClass = await createClassAction(newForm.name, newForm.description, newForm.url, newForm.image, newForm.isActive);
-      classes.value = [...classes.value, newClass];
+      classes.value = [...classes.value, newClass].sort((a, b) => {
+        // Sort by isActive descending (1 before 0), then by order
+        if (a.isActive !== b.isActive) {
+          return (b.isActive || 0) - (a.isActive || 0);
+        }
+        return (a.order || 0) - (b.order || 0);
+      });
       showAddForm.value = false;
       Object.assign(newForm, { name: '', description: '', url: '', image: '', isActive: 0 });
       newImagePreview.value = '';
@@ -392,7 +412,10 @@ export default component$(() => {
                           onClick$={() => moveClass(c.id!, 'up')}
                           class="text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
                           title="Move Up"
-                          disabled={classes.value.indexOf(c) === 0}
+                          disabled={(() => {
+                            const sameStatusClasses = classes.value.filter(item => item.isActive === c.isActive);
+                            return sameStatusClasses.indexOf(c) === 0;
+                          })()}
                         >
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
@@ -402,7 +425,10 @@ export default component$(() => {
                           onClick$={() => moveClass(c.id!, 'down')}
                           class="text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
                           title="Move Down"
-                          disabled={classes.value.indexOf(c) === classes.value.length - 1}
+                          disabled={(() => {
+                            const sameStatusClasses = classes.value.filter(item => item.isActive === c.isActive);
+                            return sameStatusClasses.indexOf(c) === sameStatusClasses.length - 1;
+                          })()}
                         >
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />

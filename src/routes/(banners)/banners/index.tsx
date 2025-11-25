@@ -383,11 +383,11 @@ export default component$(() => {
                       class="w-full p-2 border rounded"
                     />
                     {newGifPreview.value && (
-                      <div class="mt-2 relative">
-                        <img src={newGifPreview.value} alt="GIF Preview" class="max-w-xs h-auto rounded border" />
+                      <div class="mt-2 relative inline-block">
+                        <img src={newGifPreview.value} alt="GIF Preview" class="w-32 h-auto rounded border" />
                         <button
                           onClick$={removeNewGif}
-                          class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                          class="absolute top-1 right-1 bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
                         >
                           Remove
                         </button>
@@ -447,11 +447,11 @@ export default component$(() => {
                           class="w-full p-2 border rounded"
                         />
                         {editGifPreview.value && (
-                          <div class="mt-2 relative">
-                            <img src={editGifPreview.value} alt="GIF Preview" class="max-w-xs h-auto rounded border" />
+                          <div class="mt-2 relative inline-block">
+                            <img src={editGifPreview.value} alt="GIF Preview" class="w-32 h-auto rounded border" />
                             <button
                               onClick$={removeEditGif}
-                              class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                              class="absolute top-1 right-1 bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
                             >
                               Remove
                             </button>
@@ -480,11 +480,6 @@ export default component$(() => {
                           <div class="space-y-1">
                             <h3 class="font-bold text-lg hover:text-blue-600">{banner.title}</h3>
                             <p class="text-gray-600 text-sm">{banner.subtitle}</p>
-                            {banner.gif && (
-                              <div class="mt-2">
-                                <img src={banner.gif} alt="Banner GIF" class="max-w-sm h-auto rounded border" />
-                              </div>
-                            )}
                           </div>
                         </button>
                         <div class="flex gap-2 ml-4">
@@ -510,6 +505,11 @@ export default component$(() => {
                             <div dangerouslySetInnerHTML={banner.message} />
                           ) : (
                             <p class="text-gray-700">{banner.message}</p>
+                          )}
+                          {banner.gif && (
+                            <div class="mt-3">
+                              <img src={banner.gif} alt="Banner GIF" class="w-32 h-auto rounded border" />
+                            </div>
                           )}
                         </div>
                       )}
