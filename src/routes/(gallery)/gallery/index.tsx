@@ -106,6 +106,30 @@ export const deleteGalleryImageAction = server$(async function (id: number) {
   }
 });
 
+export const moveGalleryImageAction = server$(async function (id: number, direction: 'up' | 'down') {
+  console.log('moveGalleryImageAction called with:', { id, direction });
+  try {
+    const response = await fetch(`${this.url.origin}/api/gallery`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, direction }),
+    });
+    console.log('Move API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Move API error response:', errorText);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('moveGalleryImageAction error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return { success: false, error: errorMessage };
+  }
+});
+
 export default component$(() => {
   const loaderData = useGalleryImagesLoader();
   const images = useSignal<GalleryImage[]>([]);
@@ -113,6 +137,7 @@ export default component$(() => {
   const editingItem = useSignal<number | null>(null);
   const showAddForm = useSignal(false);
   const errorMessage = useSignal('');
+  const loadingMessage = useSignal('');
   const newImagePreview = useSignal<string>('');
   const editImagePreview = useSignal<string>('');
 
@@ -133,6 +158,10 @@ export default component$(() => {
 
   const clearError = $(() => {
     errorMessage.value = '';
+  });
+
+  const clearLoading = $(() => {
+    loadingMessage.value = '';
   });
 
   const toggle = $((id: number) => {
@@ -161,6 +190,8 @@ export default component$(() => {
     if (editingItem.value && editForm.image && editForm.filename) {
       console.log('Calling updateGalleryImageAction...');
       try {
+        loadingMessage.value = 'Updating image...';
+        clearError();
         const result = await updateGalleryImageAction(editingItem.value, editForm.image, editForm.filename);
         console.log('updateGalleryImageAction result:', result);
 
@@ -175,15 +206,18 @@ export default component$(() => {
           editForm.image = '';
           editForm.filename = '';
           editImagePreview.value = '';
+          loadingMessage.value = '';
           clearError();
           console.log('Edit completed successfully');
         } else {
           console.error('Update failed:', result.error);
+          loadingMessage.value = '';
           errorMessage.value = `Update failed: ${result.error}`;
         }
       } catch (error) {
         console.error('Error in updateGalleryImageAction:', error);
         const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        loadingMessage.value = '';
         errorMessage.value = `Error updating image: ${errorMsg}`;
       }
     } else {
@@ -220,9 +254,32 @@ export default component$(() => {
     }
   });
 
+  const moveImage = $(async (id: number, direction: 'up' | 'down') => {
+    try {
+      loadingMessage.value = 'Reordering image...';
+      clearError();
+      const result = await moveGalleryImageAction(id, direction);
+      if (result.success) {
+        // Reload the page to get the updated order
+        window.location.reload();
+      } else {
+        console.error('Move failed:', result.error);
+        loadingMessage.value = '';
+        errorMessage.value = `Move failed: ${result.error}`;
+      }
+    } catch (error) {
+      console.error('Error moving image:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      loadingMessage.value = '';
+      errorMessage.value = `Error moving image: ${errorMsg}`;
+    }
+  });
+
   const addImage = $(async () => {
     if (newForm.image && newForm.filename) {
       try {
+        loadingMessage.value = 'Adding image...';
+        clearError();
         const result = await createGalleryImageAction(newForm.image, newForm.filename);
         if (result.success) {
           // Add the new image to local state
@@ -232,14 +289,17 @@ export default component$(() => {
           newForm.image = '';
           newForm.filename = '';
           newImagePreview.value = '';
+          loadingMessage.value = '';
           clearError();
         } else {
           console.error('Create failed:', result.error);
+          loadingMessage.value = '';
           errorMessage.value = `Create failed: ${result.error}`;
         }
       } catch (error) {
         console.error('Error creating image:', error);
         const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        loadingMessage.value = '';
         errorMessage.value = `Error creating image: ${errorMsg}`;
       }
     } else {
@@ -311,6 +371,19 @@ export default component$(() => {
           Add Image
         </button>
       </div>
+
+      {/* Loading Message */}
+      {loadingMessage.value && (
+        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+          <div class="flex items-center">
+            <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>{loadingMessage.value}</span>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {errorMessage.value && (
@@ -414,7 +487,31 @@ export default component$(() => {
             ) : (
               /* Display mode */
               <>
-                <div class="flex justify-between items-start">
+                <div class="flex justify-between items-start gap-4">
+                  {/* Reorder arrows on the left */}
+                  <div class="flex flex-col gap-1 pt-1">
+                    <button
+                      onClick$={() => moveImage(imageItem.id!, 'up')}
+                      class="text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      title="Move Up"
+                      disabled={images.value.indexOf(imageItem) === 0}
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick$={() => moveImage(imageItem.id!, 'down')}
+                      class="text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      title="Move Down"
+                      disabled={images.value.indexOf(imageItem) === images.value.length - 1}
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
                   <button
                     onClick$={() => toggle(imageItem.id!)}
                     class="flex-1 text-left"
@@ -424,7 +521,7 @@ export default component$(() => {
                       <img src={imageItem.image} alt={imageItem.filename} class="w-24 h-24 object-cover rounded" />
                     </div>
                   </button>
-                  <div class="flex gap-2 ml-4">
+                  <div class="flex gap-2">
                     <button
                       onClick$={() => startEdit(imageItem)}
                       class="text-blue-500 hover:text-blue-700 text-sm px-2 py-1"

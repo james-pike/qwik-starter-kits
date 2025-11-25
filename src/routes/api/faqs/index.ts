@@ -1,6 +1,6 @@
 // src/routes/api/faqs/index.ts
 import type { RequestHandler } from '@builder.io/qwik-city';
-import { tursoClient, getFaqs, createFaq, updateFaq, deleteFaq } from '~/lib/turso';
+import { tursoClient, getFaqs, createFaq, updateFaq, deleteFaq, moveFaqPosition } from '~/lib/turso';
 
 export const onGet: RequestHandler = async ({ json, env }) => {
   console.log('GET /api/faqs - Request received');
@@ -93,5 +93,36 @@ export const onDelete: RequestHandler = async ({ request, json, env }) => {
     const error = err as Error;
     console.error('DELETE /api/faqs error stack:', error.stack);
     json(500, { error: 'Failed to delete faq', details: error.message });
+  }
+};
+
+export const onPatch: RequestHandler = async ({ request, json, env }) => {
+  console.log('PATCH /api/faqs - Request received');
+
+  try {
+    const body = await request.json();
+    console.log('PATCH /api/faqs - Request body:', body);
+    const { id, direction } = body;
+
+    if (!id || !direction) {
+      console.log('PATCH /api/faqs - Missing required fields:', { id, direction });
+      json(400, { error: 'ID and direction are required' });
+      return;
+    }
+
+    if (direction !== 'up' && direction !== 'down') {
+      console.log('PATCH /api/faqs - Invalid direction:', direction);
+      json(400, { error: 'Direction must be "up" or "down"' });
+      return;
+    }
+
+    const client = await tursoClient({ env });
+    await moveFaqPosition(client, id, direction);
+    console.log(`PATCH /api/faqs - FAQ ${id} moved ${direction}`);
+    json(200, { message: `FAQ moved ${direction}` });
+  } catch (err) {
+    const error = err as Error;
+    console.error('PATCH /api/faqs error stack:', error.stack);
+    json(500, { error: 'Failed to move FAQ', details: error.message });
   }
 };

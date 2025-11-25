@@ -27,7 +27,7 @@ export const onPost: RequestHandler = async ({ request, json, env }) => {
   try {
     const body = await request.json();
     console.log('POST /api/banners - Request body:', body);
-    const { title, subtitle, message } = body;
+    const { title, subtitle, message, gif } = body;
 
     if (!title || !subtitle || !message) {
       console.log('POST /api/banners - Missing required fields:', { title, subtitle, message });
@@ -36,9 +36,9 @@ export const onPost: RequestHandler = async ({ request, json, env }) => {
     }
 
     const client = await tursoClient({ env });
-    const id = await createBanner(client, title, subtitle, message);
+    const id = await createBanner(client, title, subtitle, message, gif || null);
     console.log('POST /api/banners - Banner created with ID:', id);
-    json(201, { id, title, subtitle, message });
+    json(201, { id, title, subtitle, message, gif: gif || null });
   } catch (err) {
     const error = err as Error;
     console.error('POST /api/banners error stack:', error.stack);
@@ -52,7 +52,7 @@ export const onPut: RequestHandler = async ({ request, json, env }) => {
   try {
     const body = await request.json();
     console.log('PUT /api/banners - Request body:', body);
-    const { id, title, subtitle, message } = body;
+    const { id, title, subtitle, message, gif } = body;
 
     if (!id || !title || !subtitle || !message) {
       console.log('PUT /api/banners - Missing required fields:', { id, title, subtitle, message });
@@ -61,9 +61,9 @@ export const onPut: RequestHandler = async ({ request, json, env }) => {
     }
 
     const client = await tursoClient({ env });
-    await updateBanner(client, id, title, subtitle, message);
+    await updateBanner(client, id, title, subtitle, message, gif !== undefined ? gif : null);
     console.log('PUT /api/banners - Banner updated with ID:', id);
-    json(200, { id, title, subtitle, message });
+    json(200, { id, title, subtitle, message, gif: gif !== undefined ? gif : null });
   } catch (err) {
     const error = err as Error;
     console.error('PUT /api/banners error stack:', error.stack);

@@ -1,6 +1,6 @@
 // src/routes/api/classes/index.ts
 import type { RequestHandler } from '@builder.io/qwik-city';
-import { tursoClient, getClasses, createClass, updateClass, deleteClass } from '~/lib/turso';
+import { tursoClient, getClasses, createClass, updateClass, deleteClass, moveClassPosition } from '~/lib/turso';
 
 // Helper to estimate file size from base64 string
 const getBase64SizeInBytes = (base64String: string): number => {
@@ -132,5 +132,36 @@ export const onDelete: RequestHandler = async ({ request, json, env }) => {
     const error = err as Error;
     console.error('DELETE /api/classes error stack:', error.stack);
     json(500, { error: 'Failed to delete class', details: error.message });
+  }
+};
+
+export const onPatch: RequestHandler = async ({ request, json, env }) => {
+  console.log('PATCH /api/classes - Request received');
+
+  try {
+    const body = await request.json();
+    console.log('PATCH /api/classes - Request body:', body);
+    const { id, direction } = body;
+
+    if (!id || !direction) {
+      console.log('PATCH /api/classes - Missing required fields:', { id, direction });
+      json(400, { error: 'ID and direction are required' });
+      return;
+    }
+
+    if (direction !== 'up' && direction !== 'down') {
+      console.log('PATCH /api/classes - Invalid direction:', direction);
+      json(400, { error: 'Direction must be "up" or "down"' });
+      return;
+    }
+
+    const client = await tursoClient({ env });
+    await moveClassPosition(client, id, direction);
+    console.log(`PATCH /api/classes - Class ${id} moved ${direction}`);
+    json(200, { message: `Class moved ${direction}` });
+  } catch (err) {
+    const error = err as Error;
+    console.error('PATCH /api/classes error stack:', error.stack);
+    json(500, { error: 'Failed to move class', details: error.message });
   }
 };

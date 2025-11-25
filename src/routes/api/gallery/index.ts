@@ -1,6 +1,6 @@
 // src/routes/api/gallery_images/index.ts
 import type { RequestHandler } from '@builder.io/qwik-city';
-import { tursoClient, getGalleryImages, createGalleryImage, updateGalleryImage, deleteGalleryImage } from '~/lib/turso';
+import { tursoClient, getGalleryImages, createGalleryImage, updateGalleryImage, deleteGalleryImage, moveGalleryImagePosition } from '~/lib/turso';
 
 export const onGet: RequestHandler = async ({ json, env }) => {
   console.log('GET /api/gallery_images - Request received');
@@ -105,5 +105,36 @@ export const onDelete: RequestHandler = async ({ request, json, env }) => {
     const error = err as Error;
     console.error('DELETE /api/gallery_images error stack:', error.stack);
     json(500, { error: 'Failed to delete gallery image', details: error.message });
+  }
+};
+
+export const onPatch: RequestHandler = async ({ request, json, env }) => {
+  console.log('PATCH /api/gallery_images - Request received');
+
+  try {
+    const body = await request.json();
+    console.log('PATCH /api/gallery_images - Request body:', body);
+    const { id, direction } = body;
+
+    if (!id || !direction) {
+      console.log('PATCH /api/gallery_images - Missing required fields:', { id, direction });
+      json(400, { error: 'ID and direction are required' });
+      return;
+    }
+
+    if (direction !== 'up' && direction !== 'down') {
+      console.log('PATCH /api/gallery_images - Invalid direction:', direction);
+      json(400, { error: 'Direction must be "up" or "down"' });
+      return;
+    }
+
+    const client = await tursoClient({ env });
+    await moveGalleryImagePosition(client, id, direction);
+    console.log(`PATCH /api/gallery_images - Image ${id} moved ${direction}`);
+    json(200, { message: `Image moved ${direction}` });
+  } catch (err) {
+    const error = err as Error;
+    console.error('PATCH /api/gallery_images error stack:', error.stack);
+    json(500, { error: 'Failed to move image', details: error.message });
   }
 };

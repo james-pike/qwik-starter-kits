@@ -96,6 +96,30 @@ export const deleteReviewAction = server$(async function (id: number) {
   }
 });
 
+export const moveReviewAction = server$(async function (id: number, direction: 'up' | 'down') {
+  console.log('moveReviewAction called with:', { id, direction });
+  try {
+    const response = await fetch(`${this.url.origin}/api/reviews`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, direction }),
+    });
+    console.log('Move API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Move API error response:', errorText);
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('moveReviewAction error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return { success: false, error: errorMessage };
+  }
+});
+
 export default component$(() => {
   const loaderData = useReviewsLoader();
   const reviews = useSignal<Review[]>([]);
@@ -103,6 +127,7 @@ export default component$(() => {
   const editingItem = useSignal<number | null>(null);
   const showAddForm = useSignal(false);
   const errorMessage = useSignal('');
+  const loadingMessage = useSignal('');
 
   const editForm = useStore({
     name: '',
@@ -217,6 +242,27 @@ export default component$(() => {
     }
   });
 
+  const moveReview = $(async (id: number, direction: 'up' | 'down') => {
+    try {
+      loadingMessage.value = 'Reordering review...';
+      errorMessage.value = '';
+      const result = await moveReviewAction(id, direction);
+      if (result.success) {
+        // Reload the page to get the updated order
+        window.location.reload();
+      } else {
+        console.error('Move failed:', result.error);
+        loadingMessage.value = '';
+        errorMessage.value = `Move failed: ${result.error}`;
+      }
+    } catch (error) {
+      console.error('Error moving review:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      loadingMessage.value = '';
+      errorMessage.value = `Error moving review: ${errorMsg}`;
+    }
+  });
+
   const addReview = $(async () => {
     if (newForm.name && newForm.review && newForm.rating && newForm.date) {
       try {
@@ -270,6 +316,19 @@ export default component$(() => {
           Add Review
         </button>
       </div>
+
+      {/* Loading Message */}
+      {loadingMessage.value && (
+        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+          <div class="flex items-center">
+            <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>{loadingMessage.value}</span>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {errorMessage.value && (
@@ -389,7 +448,31 @@ export default component$(() => {
             ) : (
               /* Display mode */
               <>
-                <div class="flex justify-between items-start">
+                <div class="flex justify-between items-start gap-4">
+                  {/* Reorder arrows on the left */}
+                  <div class="flex flex-col gap-1 pt-1">
+                    <button
+                      onClick$={() => moveReview(review.id!, 'up')}
+                      class="text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      title="Move Up"
+                      disabled={reviews.value.indexOf(review) === 0}
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick$={() => moveReview(review.id!, 'down')}
+                      class="text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      title="Move Down"
+                      disabled={reviews.value.indexOf(review) === reviews.value.length - 1}
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
                   <button
                     onClick$={() => toggle(review.id!)}
                     class="flex-1 text-left"
@@ -400,7 +483,7 @@ export default component$(() => {
                       <p class="text-gray-600 text-sm">Rating: {review.rating}/5</p>
                     </div>
                   </button>
-                  <div class="flex gap-2 ml-4">
+                  <div class="flex gap-2">
                     <button
                       onClick$={() => startEdit(review)}
                       class="text-blue-500 hover:text-blue-700 text-sm px-2 py-1"

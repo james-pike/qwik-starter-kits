@@ -34,6 +34,7 @@ export interface Faq {
   question: string;
   answer: string;
   isHtml?: boolean;
+  position?: number;
 }
 
 export interface Banner {
@@ -42,6 +43,7 @@ export interface Banner {
   subtitle: string;
   message: string;
   isHtml?: boolean;
+  gif?: string | null; // Base64-encoded GIF or null
 }
 
 export interface Review {
@@ -50,6 +52,7 @@ export interface Review {
   review: string;
   rating: number;
   date: string;
+  position?: number;
 }
 
 export interface Class {
@@ -59,12 +62,14 @@ export interface Class {
   url: string;
   image: string; // Base64-encoded image
   isActive: number;
+  position?: number;
 }
 
 export interface GalleryImage {
   id?: number;
   image: string; // Base64-encoded image
   filename: string;
+  position?: number;
 }
 
 export interface User {
@@ -85,7 +90,8 @@ async function initializeDatabase(client: Client) {
       CREATE TABLE IF NOT EXISTS faqs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         question TEXT NOT NULL,
-        answer TEXT NOT NULL
+        answer TEXT NOT NULL,
+        position INTEGER DEFAULT 0
       )
     `);
 
@@ -95,7 +101,8 @@ async function initializeDatabase(client: Client) {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         subtitle TEXT NOT NULL,
-        message TEXT NOT NULL
+        message TEXT NOT NULL,
+        gif TEXT
       )
     `);
 
@@ -106,7 +113,8 @@ async function initializeDatabase(client: Client) {
         name TEXT NOT NULL,
         review TEXT NOT NULL,
         rating INTEGER NOT NULL,
-        date TEXT NOT NULL
+        date TEXT NOT NULL,
+        position INTEGER DEFAULT 0
       )
     `);
 
@@ -118,7 +126,8 @@ async function initializeDatabase(client: Client) {
         description TEXT NOT NULL,
         url TEXT NOT NULL,
         image TEXT NOT NULL,
-        isActive INTEGER NOT NULL
+        isActive INTEGER NOT NULL,
+        position INTEGER DEFAULT 0
       )
     `);
 
@@ -127,9 +136,108 @@ async function initializeDatabase(client: Client) {
       CREATE TABLE IF NOT EXISTS gallery_images (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         image TEXT NOT NULL, -- Base64-encoded image
-        filename TEXT NOT NULL
+        filename TEXT NOT NULL,
+        position INTEGER DEFAULT 0
       )
     `);
+
+    // Migrate existing tables to add position column if it doesn't exist
+    try {
+      // Check if position column exists in faqs table
+      const faqsInfo = await client.execute('PRAGMA table_info(faqs)');
+      const hasFaqsPosition = faqsInfo.rows.some((row: any) => row.name === 'position');
+
+      if (!hasFaqsPosition) {
+        console.log('Adding position column to faqs table');
+        await client.execute('ALTER TABLE faqs ADD COLUMN position INTEGER DEFAULT 0');
+        // Set position based on current id order
+        const faqs = await client.execute('SELECT id FROM faqs ORDER BY id ASC');
+        for (let i = 0; i < faqs.rows.length; i++) {
+          await client.execute({
+            sql: 'UPDATE faqs SET position = ? WHERE id = ?',
+            args: [i, faqs.rows[i].id],
+          });
+        }
+      }
+    } catch (error) {
+      console.log('FAQs table migration skipped or failed:', error);
+    }
+
+    try {
+      // Check if position column exists in reviews table
+      const reviewsInfo = await client.execute('PRAGMA table_info(reviews)');
+      const hasReviewsPosition = reviewsInfo.rows.some((row: any) => row.name === 'position');
+
+      if (!hasReviewsPosition) {
+        console.log('Adding position column to reviews table');
+        await client.execute('ALTER TABLE reviews ADD COLUMN position INTEGER DEFAULT 0');
+        // Set position based on current id order
+        const reviews = await client.execute('SELECT id FROM reviews ORDER BY id ASC');
+        for (let i = 0; i < reviews.rows.length; i++) {
+          await client.execute({
+            sql: 'UPDATE reviews SET position = ? WHERE id = ?',
+            args: [i, reviews.rows[i].id],
+          });
+        }
+      }
+    } catch (error) {
+      console.log('Reviews table migration skipped or failed:', error);
+    }
+
+    try {
+      // Check if position column exists in classes table
+      const classesInfo = await client.execute('PRAGMA table_info(classes)');
+      const hasClassesPosition = classesInfo.rows.some((row: any) => row.name === 'position');
+
+      if (!hasClassesPosition) {
+        console.log('Adding position column to classes table');
+        await client.execute('ALTER TABLE classes ADD COLUMN position INTEGER DEFAULT 0');
+        // Set position based on current id order
+        const classes = await client.execute('SELECT id FROM classes ORDER BY id ASC');
+        for (let i = 0; i < classes.rows.length; i++) {
+          await client.execute({
+            sql: 'UPDATE classes SET position = ? WHERE id = ?',
+            args: [i, classes.rows[i].id],
+          });
+        }
+      }
+    } catch (error) {
+      console.log('Classes table migration skipped or failed:', error);
+    }
+
+    try {
+      // Check if position column exists in gallery_images table
+      const galleryInfo = await client.execute('PRAGMA table_info(gallery_images)');
+      const hasGalleryPosition = galleryInfo.rows.some((row: any) => row.name === 'position');
+
+      if (!hasGalleryPosition) {
+        console.log('Adding position column to gallery_images table');
+        await client.execute('ALTER TABLE gallery_images ADD COLUMN position INTEGER DEFAULT 0');
+        // Set position based on current id order
+        const images = await client.execute('SELECT id FROM gallery_images ORDER BY id ASC');
+        for (let i = 0; i < images.rows.length; i++) {
+          await client.execute({
+            sql: 'UPDATE gallery_images SET position = ? WHERE id = ?',
+            args: [i, images.rows[i].id],
+          });
+        }
+      }
+    } catch (error) {
+      console.log('Gallery images table migration skipped or failed:', error);
+    }
+
+    try {
+      // Check if gif column exists in banners table
+      const bannersInfo = await client.execute('PRAGMA table_info(banners)');
+      const hasBannersGif = bannersInfo.rows.some((row: any) => row.name === 'gif');
+
+      if (!hasBannersGif) {
+        console.log('Adding gif column to banners table');
+        await client.execute('ALTER TABLE banners ADD COLUMN gif TEXT');
+      }
+    } catch (error) {
+      console.log('Banners table migration skipped or failed:', error);
+    }
 
     // Create users table if it doesn't exist
     await client.execute(`
@@ -188,12 +296,13 @@ export async function getUserByEmail(client: Client, email: string): Promise<Use
 // FAQ CRUD functions
 export async function getFaqs(client: Client): Promise<Faq[]> {
   try {
-    const res = await client.execute('SELECT * FROM faqs ORDER BY id ASC');
+    const res = await client.execute('SELECT * FROM faqs ORDER BY position ASC, id ASC');
     return res.rows.map((r: any) => ({
       id: Number(r.id),
       question: String(r.question ?? ''),
       answer: String(r.answer ?? ''),
       isHtml: String(r.answer ?? '').includes('<'),
+      position: Number(r.position ?? 0),
     }));
   } catch (error) {
     console.error('Error fetching FAQs:', error);
@@ -204,9 +313,14 @@ export async function getFaqs(client: Client): Promise<Faq[]> {
 export async function createFaq(client: Client, question: string, answer: string): Promise<number> {
   if (!question || !answer) throw new Error('Question and answer must not be empty');
   try {
+    // Get the max position and add 1
+    const maxPosRes = await client.execute('SELECT COALESCE(MAX(position), -1) as maxPos FROM faqs');
+    const maxPos = Number(maxPosRes.rows[0].maxPos);
+    const newPosition = maxPos + 1;
+
     const res = await client.execute({
-      sql: 'INSERT INTO faqs (question, answer) VALUES (?, ?)',
-      args: [question, answer],
+      sql: 'INSERT INTO faqs (question, answer, position) VALUES (?, ?, ?)',
+      args: [question, answer, newPosition],
     });
     if (res.lastInsertRowid === undefined) throw new Error('Failed to get last insert row ID');
     const rowIdNum = Number(res.lastInsertRowid);
@@ -258,6 +372,7 @@ export async function getBanners(client: Client): Promise<Banner[]> {
       subtitle: String(r.subtitle ?? ''),
       message: String(r.message ?? ''),
       isHtml: [r.title, r.subtitle, r.message].some(field => String(field ?? '').includes('<')),
+      gif: r.gif ? String(r.gif) : null,
     }));
   } catch (error) {
     console.error('Error fetching banners:', error);
@@ -265,12 +380,12 @@ export async function getBanners(client: Client): Promise<Banner[]> {
   }
 }
 
-export async function createBanner(client: Client, title: string, subtitle: string, message: string): Promise<number> {
+export async function createBanner(client: Client, title: string, subtitle: string, message: string, gif?: string | null): Promise<number> {
   if (!title || !subtitle || !message) throw new Error('Title, subtitle, and message must not be empty');
   try {
     const res = await client.execute({
-      sql: 'INSERT INTO banners (title, subtitle, message) VALUES (?, ?, ?)',
-      args: [title, subtitle, message],
+      sql: 'INSERT INTO banners (title, subtitle, message, gif) VALUES (?, ?, ?, ?)',
+      args: [title, subtitle, message, gif || null],
     });
     if (res.lastInsertRowid === undefined) throw new Error('Failed to get last insert row ID');
     const rowIdNum = Number(res.lastInsertRowid);
@@ -283,12 +398,12 @@ export async function createBanner(client: Client, title: string, subtitle: stri
   }
 }
 
-export async function updateBanner(client: Client, id: number, title: string, subtitle: string, message: string) {
+export async function updateBanner(client: Client, id: number, title: string, subtitle: string, message: string, gif?: string | null) {
   if (!title || !subtitle || !message) throw new Error('Title, subtitle, and message must not be empty');
   try {
     const res = await client.execute({
-      sql: 'UPDATE banners SET title = ?, subtitle = ?, message = ? WHERE id = ?',
-      args: [title, subtitle, message, id],
+      sql: 'UPDATE banners SET title = ?, subtitle = ?, message = ?, gif = ? WHERE id = ?',
+      args: [title, subtitle, message, gif !== undefined ? gif : null, id],
     });
     if (res.rowsAffected === 0) throw new Error(`No banner found with ID: ${id}`);
     console.log(`Updated banner with ID: ${id}`);
@@ -315,7 +430,7 @@ export async function deleteBanner(client: Client, id: number) {
 // Review CRUD functions
 export async function getReviews(client: Client): Promise<Review[]> {
   try {
-    const res = await client.execute('SELECT * FROM reviews ORDER BY id ASC');
+    const res = await client.execute('SELECT * FROM reviews ORDER BY position ASC, id ASC');
     const reviews = res.rows.map((r: any) => {
       const review = String(r.review ?? '');
       console.log(`Fetched review ID ${r.id}: review = ${review}`);
@@ -325,6 +440,7 @@ export async function getReviews(client: Client): Promise<Review[]> {
         review,
         rating: Number(r.rating ?? 0),
         date: String(r.date ?? ''),
+        position: Number(r.position ?? 0),
       };
     });
     console.log(`Fetched ${reviews.length} reviews`);
@@ -345,10 +461,15 @@ export async function createReview(
   if (!name || !review || !date) throw new Error('All review fields must not be empty');
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new Error('Rating must be an integer between 1 and 5');
   try {
+    // Get the max position and add 1
+    const maxPosRes = await client.execute('SELECT COALESCE(MAX(position), -1) as maxPos FROM reviews');
+    const maxPos = Number(maxPosRes.rows[0].maxPos);
+    const newPosition = maxPos + 1;
+
     console.log(`Creating review with review: ${review}`);
     const res = await client.execute({
-      sql: 'INSERT INTO reviews (name, review, rating, date) VALUES (?, ?, ?, ?)',
-      args: [name, review, rating, date],
+      sql: 'INSERT INTO reviews (name, review, rating, date, position) VALUES (?, ?, ?, ?, ?)',
+      args: [name, review, rating, date, newPosition],
     });
     if (res.lastInsertRowid === undefined) throw new Error('Failed to get last insert row ID');
     const rowIdNum = Number(res.lastInsertRowid);
@@ -416,7 +537,7 @@ export async function deleteReview(client: Client, id: number) {
 // Class CRUD functions
 export async function getClasses(client: Client): Promise<Class[]> {
   try {
-    const res = await client.execute('SELECT * FROM classes ORDER BY id ASC');
+    const res = await client.execute('SELECT * FROM classes ORDER BY position ASC, id ASC');
     const classes = res.rows.map((r: any) => ({
       id: Number(r.id),
       name: String(r.name ?? ''),
@@ -424,6 +545,7 @@ export async function getClasses(client: Client): Promise<Class[]> {
       url: String(r.url ?? ''),
       image: String(r.image ?? ''),
       isActive: Number(r.isActive ?? 0),
+      position: Number(r.position ?? 0),
     }));
     console.log(`Fetched ${classes.length} classes`);
     return classes;
@@ -451,10 +573,15 @@ export async function createClass(
     throw new Error('Image must be a valid base64-encoded image (data:image/*;base64,...)');
   }
   try {
-    console.log(`Creating class with name: ${name}, image length: ${image.length}`);
+    // Get the max position and add 1
+    const maxPosRes = await client.execute('SELECT COALESCE(MAX(position), -1) as maxPos FROM classes');
+    const maxPos = Number(maxPosRes.rows[0].maxPos);
+    const newPosition = maxPos + 1;
+
+    console.log(`Creating class with name: ${name}, image length: ${image.length}, position: ${newPosition}`);
     const res = await client.execute({
-      sql: 'INSERT INTO classes (name, description, url, image, isActive) VALUES (?, ?, ?, ?, ?)',
-      args: [name, description, url, image, isActive],
+      sql: 'INSERT INTO classes (name, description, url, image, isActive, position) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [name, description, url, image, isActive, newPosition],
     });
     if (res.lastInsertRowid === undefined) throw new Error('Failed to get last insert row ID');
     const rowIdNum = Number(res.lastInsertRowid);
@@ -534,11 +661,12 @@ export async function deleteClass(client: Client, id: number) {
 // Gallery Image CRUD functions
 export async function getGalleryImages(client: Client): Promise<GalleryImage[]> {
   try {
-    const res = await client.execute('SELECT * FROM gallery_images ORDER BY id ASC');
+    const res = await client.execute('SELECT * FROM gallery_images ORDER BY position ASC, id ASC');
     const images = res.rows.map((r: any) => ({
       id: Number(r.id),
       image: String(r.image ?? ''),
       filename: String(r.filename ?? ''),
+      position: Number(r.position ?? 0),
     }));
     console.log(`Fetched ${images.length} gallery images`);
     return images;
@@ -556,10 +684,15 @@ export async function createGalleryImage(client: Client, image: string, filename
     throw new Error('Image must be a valid base64-encoded image (data:image/*;base64,...)');
   }
   try {
-    console.log(`Creating gallery image with filename: ${filename}, image length: ${image.length}`);
+    // Get the max position and add 1
+    const maxPosRes = await client.execute('SELECT COALESCE(MAX(position), -1) as maxPos FROM gallery_images');
+    const maxPos = Number(maxPosRes.rows[0].maxPos);
+    const newPosition = maxPos + 1;
+
+    console.log(`Creating gallery image with filename: ${filename}, image length: ${image.length}, position: ${newPosition}`);
     const res = await client.execute({
-      sql: 'INSERT INTO gallery_images (image, filename) VALUES (?, ?)',
-      args: [image, filename],
+      sql: 'INSERT INTO gallery_images (image, filename, position) VALUES (?, ?, ?)',
+      args: [image, filename, newPosition],
     });
     if (res.lastInsertRowid === undefined) throw new Error('Failed to get last insert row ID');
     const rowIdNum = Number(res.lastInsertRowid);
@@ -622,5 +755,198 @@ export async function deleteGalleryImage(client: Client, id: number) {
   } catch (error) {
     console.error('Error deleting gallery image:', error);
     throw new Error(`Failed to delete gallery image: ${error}`);
+  }
+}
+
+// Reorder functions - Move up/down one position
+export async function moveClassPosition(client: Client, id: number, direction: 'up' | 'down'): Promise<void> {
+  try {
+    console.log(`Moving class ${id} ${direction}`);
+
+    // Get the current class
+    const currentRes = await client.execute({
+      sql: 'SELECT id, position FROM classes WHERE id = ?',
+      args: [id],
+    });
+
+    if (currentRes.rows.length === 0) {
+      throw new Error(`Class with ID ${id} not found`);
+    }
+
+    const currentPosition = Number(currentRes.rows[0].position);
+    const newPosition = direction === 'up' ? currentPosition - 1 : currentPosition + 1;
+
+    // Find the class at the target position
+    const targetRes = await client.execute({
+      sql: 'SELECT id, position FROM classes WHERE position = ?',
+      args: [newPosition],
+    });
+
+    if (targetRes.rows.length === 0) {
+      console.log(`No class at position ${newPosition}, cannot move ${direction}`);
+      return; // Can't move further in this direction
+    }
+
+    const targetId = Number(targetRes.rows[0].id);
+
+    // Swap positions
+    await client.execute({
+      sql: 'UPDATE classes SET position = ? WHERE id = ?',
+      args: [newPosition, id],
+    });
+
+    await client.execute({
+      sql: 'UPDATE classes SET position = ? WHERE id = ?',
+      args: [currentPosition, targetId],
+    });
+
+    console.log(`Swapped positions: class ${id} (${currentPosition} -> ${newPosition}), class ${targetId} (${newPosition} -> ${currentPosition})`);
+  } catch (error) {
+    console.error('Error moving class position:', error);
+    throw new Error(`Failed to move class position: ${error}`);
+  }
+}
+
+export async function moveGalleryImagePosition(client: Client, id: number, direction: 'up' | 'down'): Promise<void> {
+  try {
+    console.log(`Moving gallery image ${id} ${direction}`);
+
+    // Get the current image
+    const currentRes = await client.execute({
+      sql: 'SELECT id, position FROM gallery_images WHERE id = ?',
+      args: [id],
+    });
+
+    if (currentRes.rows.length === 0) {
+      throw new Error(`Gallery image with ID ${id} not found`);
+    }
+
+    const currentPosition = Number(currentRes.rows[0].position);
+    const newPosition = direction === 'up' ? currentPosition - 1 : currentPosition + 1;
+
+    // Find the image at the target position
+    const targetRes = await client.execute({
+      sql: 'SELECT id, position FROM gallery_images WHERE position = ?',
+      args: [newPosition],
+    });
+
+    if (targetRes.rows.length === 0) {
+      console.log(`No image at position ${newPosition}, cannot move ${direction}`);
+      return; // Can't move further in this direction
+    }
+
+    const targetId = Number(targetRes.rows[0].id);
+
+    // Swap positions
+    await client.execute({
+      sql: 'UPDATE gallery_images SET position = ? WHERE id = ?',
+      args: [newPosition, id],
+    });
+
+    await client.execute({
+      sql: 'UPDATE gallery_images SET position = ? WHERE id = ?',
+      args: [currentPosition, targetId],
+    });
+
+    console.log(`Swapped positions: image ${id} (${currentPosition} -> ${newPosition}), image ${targetId} (${newPosition} -> ${currentPosition})`);
+  } catch (error) {
+    console.error('Error moving gallery image position:', error);
+    throw new Error(`Failed to move gallery image position: ${error}`);
+  }
+}
+
+export async function moveFaqPosition(client: Client, id: number, direction: 'up' | 'down'): Promise<void> {
+  try {
+    console.log(`Moving FAQ ${id} ${direction}`);
+
+    // Get the current FAQ
+    const currentRes = await client.execute({
+      sql: 'SELECT id, position FROM faqs WHERE id = ?',
+      args: [id],
+    });
+
+    if (currentRes.rows.length === 0) {
+      throw new Error(`FAQ with ID ${id} not found`);
+    }
+
+    const currentPosition = Number(currentRes.rows[0].position);
+    const newPosition = direction === 'up' ? currentPosition - 1 : currentPosition + 1;
+
+    // Find the FAQ at the target position
+    const targetRes = await client.execute({
+      sql: 'SELECT id, position FROM faqs WHERE position = ?',
+      args: [newPosition],
+    });
+
+    if (targetRes.rows.length === 0) {
+      console.log(`No FAQ at position ${newPosition}, cannot move ${direction}`);
+      return; // Can't move further in this direction
+    }
+
+    const targetId = Number(targetRes.rows[0].id);
+
+    // Swap positions
+    await client.execute({
+      sql: 'UPDATE faqs SET position = ? WHERE id = ?',
+      args: [newPosition, id],
+    });
+
+    await client.execute({
+      sql: 'UPDATE faqs SET position = ? WHERE id = ?',
+      args: [currentPosition, targetId],
+    });
+
+    console.log(`Swapped positions: FAQ ${id} (${currentPosition} -> ${newPosition}), FAQ ${targetId} (${newPosition} -> ${currentPosition})`);
+  } catch (error) {
+    console.error('Error moving FAQ position:', error);
+    throw new Error(`Failed to move FAQ position: ${error}`);
+  }
+}
+
+export async function moveReviewPosition(client: Client, id: number, direction: 'up' | 'down'): Promise<void> {
+  try {
+    console.log(`Moving review ${id} ${direction}`);
+
+    // Get the current review
+    const currentRes = await client.execute({
+      sql: 'SELECT id, position FROM reviews WHERE id = ?',
+      args: [id],
+    });
+
+    if (currentRes.rows.length === 0) {
+      throw new Error(`Review with ID ${id} not found`);
+    }
+
+    const currentPosition = Number(currentRes.rows[0].position);
+    const newPosition = direction === 'up' ? currentPosition - 1 : currentPosition + 1;
+
+    // Find the review at the target position
+    const targetRes = await client.execute({
+      sql: 'SELECT id, position FROM reviews WHERE position = ?',
+      args: [newPosition],
+    });
+
+    if (targetRes.rows.length === 0) {
+      console.log(`No review at position ${newPosition}, cannot move ${direction}`);
+      return; // Can't move further in this direction
+    }
+
+    const targetId = Number(targetRes.rows[0].id);
+
+    // Swap positions
+    await client.execute({
+      sql: 'UPDATE reviews SET position = ? WHERE id = ?',
+      args: [newPosition, id],
+    });
+
+    await client.execute({
+      sql: 'UPDATE reviews SET position = ? WHERE id = ?',
+      args: [currentPosition, targetId],
+    });
+
+    console.log(`Swapped positions: review ${id} (${currentPosition} -> ${newPosition}), review ${targetId} (${newPosition} -> ${currentPosition})`);
+  } catch (error) {
+    console.error('Error moving review position:', error);
+    throw new Error(`Failed to move review position: ${error}`);
   }
 }

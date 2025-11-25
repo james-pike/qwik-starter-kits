@@ -6,6 +6,7 @@ import {
   createReview,
   updateReview,
   deleteReview,
+  moveReviewPosition,
 } from '~/lib/turso';
 
 export const onGet: RequestHandler = async ({ json, env }) => {
@@ -103,5 +104,36 @@ export const onDelete: RequestHandler = async ({ request, json, env }) => {
     const error = err as Error;
     console.error('DELETE /api/reviews error stack:', error.stack);
     json(500, { error: 'Failed to delete review', details: error.message });
+  }
+};
+
+export const onPatch: RequestHandler = async ({ request, json, env }) => {
+  console.log('PATCH /api/reviews - Request received');
+
+  try {
+    const body = await request.json();
+    console.log('PATCH /api/reviews - Request body:', body);
+    const { id, direction } = body;
+
+    if (!id || !direction) {
+      console.log('PATCH /api/reviews - Missing required fields:', { id, direction });
+      json(400, { error: 'ID and direction are required' });
+      return;
+    }
+
+    if (direction !== 'up' && direction !== 'down') {
+      console.log('PATCH /api/reviews - Invalid direction:', direction);
+      json(400, { error: 'Direction must be "up" or "down"' });
+      return;
+    }
+
+    const client = await tursoClient({ env });
+    await moveReviewPosition(client, id, direction);
+    console.log(`PATCH /api/reviews - Review ${id} moved ${direction}`);
+    json(200, { message: `Review moved ${direction}` });
+  } catch (err) {
+    const error = err as Error;
+    console.error('PATCH /api/reviews error stack:', error.stack);
+    json(500, { error: 'Failed to move review', details: error.message });
   }
 };

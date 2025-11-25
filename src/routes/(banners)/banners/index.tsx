@@ -22,13 +22,13 @@ export const useBannersLoader = routeLoader$<Banner[]>(async ({ env }) => {
 });
 
 // Server actions for CRUD operations
-export const createBannerAction = server$(async function (title: string, subtitle: string, message: string) {
-  console.log('createBannerAction called with:', { title, subtitle, message });
+export const createBannerAction = server$(async function (title: string, subtitle: string, message: string, gif?: string | null) {
+  console.log('createBannerAction called with:', { title, subtitle, message, hasGif: !!gif });
   try {
     const response = await fetch(`${this.url.origin}/api/banners`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, subtitle, message }),
+      body: JSON.stringify({ title, subtitle, message, gif: gif || null }),
     });
     console.log('Create API response status:', response.status);
 
@@ -48,13 +48,13 @@ export const createBannerAction = server$(async function (title: string, subtitl
   }
 });
 
-export const updateBannerAction = server$(async function (id: number, title: string, subtitle: string, message: string) {
-  console.log('updateBannerAction called with:', { id, title, subtitle, message });
+export const updateBannerAction = server$(async function (id: number, title: string, subtitle: string, message: string, gif?: string | null) {
+  console.log('updateBannerAction called with:', { id, title, subtitle, message, hasGif: !!gif });
   try {
     const response = await fetch(`${this.url.origin}/api/banners`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, title, subtitle, message }),
+      body: JSON.stringify({ id, title, subtitle, message, gif: gif !== undefined ? gif : null }),
     });
     console.log('Update API response status:', response.status);
 
@@ -106,17 +106,21 @@ export default component$(() => {
   const editingItem = useSignal<number | null>(null);
   const showAddForm = useSignal(false);
   const errorMessage = useSignal('');
+  const newGifPreview = useSignal<string>('');
+  const editGifPreview = useSignal<string>('');
 
   const editForm = useStore({
     title: '',
     subtitle: '',
     message: '',
+    gif: null as string | null,
   });
 
   const newForm = useStore({
     title: '',
     subtitle: '',
     message: '',
+    gif: null as string | null,
   });
 
   useVisibleTask$(() => {
@@ -130,6 +134,62 @@ export default component$(() => {
     errorMessage.value = '';
   });
 
+  // Convert file to base64
+  const fileToBase64 = $(async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  });
+
+  const handleNewGif = $(async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files?.[0]) {
+      const file = input.files[0];
+      if (!file.type.startsWith('image/')) {
+        errorMessage.value = 'Please select a valid image file (GIF).';
+        return;
+      }
+
+      try {
+        newForm.gif = await fileToBase64(file);
+        newGifPreview.value = newForm.gif;
+      } catch (err) {
+        errorMessage.value = err instanceof Error ? err.message : 'Failed to process GIF';
+      }
+    }
+  });
+
+  const handleEditGif = $(async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files?.[0]) {
+      const file = input.files[0];
+      if (!file.type.startsWith('image/')) {
+        errorMessage.value = 'Please select a valid image file (GIF).';
+        return;
+      }
+
+      try {
+        editForm.gif = await fileToBase64(file);
+        editGifPreview.value = editForm.gif;
+      } catch (err) {
+        errorMessage.value = err instanceof Error ? err.message : 'Failed to process GIF';
+      }
+    }
+  });
+
+  const removeNewGif = $(() => {
+    newForm.gif = null;
+    newGifPreview.value = '';
+  });
+
+  const removeEditGif = $(() => {
+    editForm.gif = null;
+    editGifPreview.value = '';
+  });
+
   const toggle = $((id: number) => {
     openItem.value = openItem.value === id ? null : id;
   });
@@ -139,6 +199,8 @@ export default component$(() => {
     editForm.title = banner.title;
     editForm.subtitle = banner.subtitle;
     editForm.message = banner.message;
+    editForm.gif = banner.gif || null;
+    editGifPreview.value = banner.gif || '';
     clearError();
   });
 
@@ -147,6 +209,8 @@ export default component$(() => {
     editForm.title = '';
     editForm.subtitle = '';
     editForm.message = '';
+    editForm.gif = null;
+    editGifPreview.value = '';
     clearError();
   });
 
@@ -156,19 +220,21 @@ export default component$(() => {
     if (editingItem.value && editForm.title && editForm.subtitle && editForm.message) {
       console.log('Calling updateBannerAction...');
       try {
-        const result = await updateBannerAction(editingItem.value, editForm.title, editForm.subtitle, editForm.message);
+        const result = await updateBannerAction(editingItem.value, editForm.title, editForm.subtitle, editForm.message, editForm.gif);
         console.log('updateBannerAction result:', result);
 
         if (result.success) {
           banners.value = banners.value.map((banner) =>
             banner.id === editingItem.value
-              ? { ...banner, title: editForm.title, subtitle: editForm.subtitle, message: editForm.message, isHtml: editForm.message.includes('<') }
+              ? { ...banner, title: editForm.title, subtitle: editForm.subtitle, message: editForm.message, isHtml: editForm.message.includes('<'), gif: editForm.gif }
               : banner
           );
           editingItem.value = null;
           editForm.title = '';
           editForm.subtitle = '';
           editForm.message = '';
+          editForm.gif = null;
+          editGifPreview.value = '';
           clearError();
           console.log('Edit completed successfully');
         } else {
@@ -215,7 +281,7 @@ export default component$(() => {
   const addBanner = $(async () => {
     if (newForm.title && newForm.subtitle && newForm.message) {
       try {
-        const result = await createBannerAction(newForm.title, newForm.subtitle, newForm.message);
+        const result = await createBannerAction(newForm.title, newForm.subtitle, newForm.message, newForm.gif);
         if (result.success) {
           const newBanner = result.data;
           banners.value = [...banners.value, newBanner];
@@ -223,6 +289,8 @@ export default component$(() => {
           newForm.title = '';
           newForm.subtitle = '';
           newForm.message = '';
+          newForm.gif = null;
+          newGifPreview.value = '';
           clearError();
         } else {
           console.error('Create failed:', result.error);
@@ -247,6 +315,8 @@ export default component$(() => {
     newForm.title = '';
     newForm.subtitle = '';
     newForm.message = '';
+    newForm.gif = null;
+    newGifPreview.value = '';
     clearError();
   });
 
@@ -304,6 +374,26 @@ export default component$(() => {
                     onInput$={(e) => (newForm.message = (e.target as HTMLTextAreaElement).value)}
                     class="w-full p-2 border rounded h-24"
                   />
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">GIF (Optional)</label>
+                    <input
+                      type="file"
+                      accept="image/gif,image/*"
+                      onChange$={handleNewGif}
+                      class="w-full p-2 border rounded"
+                    />
+                    {newGifPreview.value && (
+                      <div class="mt-2 relative">
+                        <img src={newGifPreview.value} alt="GIF Preview" class="max-w-xs h-auto rounded border" />
+                        <button
+                          onClick$={removeNewGif}
+                          class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div class="flex gap-2">
                     <button
                       onClick$={addBanner}
@@ -348,6 +438,26 @@ export default component$(() => {
                         class="w-full p-2 border rounded h-24"
                         placeholder="Message"
                       />
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">GIF (Optional)</label>
+                        <input
+                          type="file"
+                          accept="image/gif,image/*"
+                          onChange$={handleEditGif}
+                          class="w-full p-2 border rounded"
+                        />
+                        {editGifPreview.value && (
+                          <div class="mt-2 relative">
+                            <img src={editGifPreview.value} alt="GIF Preview" class="max-w-xs h-auto rounded border" />
+                            <button
+                              onClick$={removeEditGif}
+                              class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <div class="flex gap-2">
                         <button
                           onClick$={saveEdit}
@@ -370,6 +480,11 @@ export default component$(() => {
                           <div class="space-y-1">
                             <h3 class="font-bold text-lg hover:text-blue-600">{banner.title}</h3>
                             <p class="text-gray-600 text-sm">{banner.subtitle}</p>
+                            {banner.gif && (
+                              <div class="mt-2">
+                                <img src={banner.gif} alt="Banner GIF" class="max-w-sm h-auto rounded border" />
+                              </div>
+                            )}
                           </div>
                         </button>
                         <div class="flex gap-2 ml-4">
