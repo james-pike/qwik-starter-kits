@@ -151,11 +151,11 @@ export default component$(() => {
   // Initialize classes and sort them (active first, inactive at bottom)
   if (userSignal.value?.user) {
     classes.value = [...loaderData.value].sort((a, b) => {
-      // Sort by isActive descending (1 before 0), then by order
+      // Sort by isActive descending (1 before 0), then by position
       if (a.isActive !== b.isActive) {
         return (b.isActive || 0) - (a.isActive || 0);
       }
-      return (a.order || 0) - (b.order || 0);
+      return (a.position || 0) - (b.position || 0);
     });
   }
 
@@ -226,11 +226,11 @@ export default component$(() => {
       classes.value = classes.value.map(item =>
         item.id === editingItem.value ? { ...item, ...editForm } : item
       ).sort((a, b) => {
-        // Sort by isActive descending (1 before 0), then by order
+        // Sort by isActive descending (1 before 0), then by position
         if (a.isActive !== b.isActive) {
           return (b.isActive || 0) - (a.isActive || 0);
         }
-        return (a.order || 0) - (b.order || 0);
+        return (a.position || 0) - (b.position || 0);
       });
       loadingMessage.value = '';
       cancelEdit();
@@ -246,11 +246,11 @@ export default component$(() => {
       errorMessage.value = '';
       const newClass = await createClassAction(newForm.name, newForm.description, newForm.url, newForm.image, newForm.isActive);
       classes.value = [...classes.value, newClass].sort((a, b) => {
-        // Sort by isActive descending (1 before 0), then by order
+        // Sort by isActive descending (1 before 0), then by position
         if (a.isActive !== b.isActive) {
           return (b.isActive || 0) - (a.isActive || 0);
         }
-        return (a.order || 0) - (b.order || 0);
+        return (a.position || 0) - (b.position || 0);
       });
       showAddForm.value = false;
       Object.assign(newForm, { name: '', description: '', url: '', image: '', isActive: 0 });
