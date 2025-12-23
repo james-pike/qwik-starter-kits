@@ -105,7 +105,7 @@ export const Header = component$(() => {
 
     // Determine cooldown duration based on redeploy count
     // First redeploy: 5 minutes, subsequent: 10 minutes
-    const cooldownDuration = redeployCount.value === 0 ? 5 * 60 * 1000 : 10 * 60 * 1000;
+    const cooldownDuration = redeployCount.value === 0 ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const endTime = Date.now() + cooldownDuration;
 
     redeployDisabled.value = true;
